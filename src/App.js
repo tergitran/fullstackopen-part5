@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import Blog from "./components/Blog";
 import Notification from "./components/Notification";
+import ToggleContent from "./components/ToggleContent";
+import BlogForm from "./components/BlogForm";
 import blogService from "./services/blogs";
 import authenService from "./services/authen";
 
@@ -10,15 +12,14 @@ const App = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  //TODO: should I only use one object?
-  const [title, setTitle] = useState("");
-  const [author, setAuthor] = useState("");
-  const [url, setUrl] = useState("");
-
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
-    blogService.getAll().then((blogs) => setBlogs(blogs));
+    try {
+      getBlogs();
+    } catch (error) {
+      console.log(error);
+    }
   }, []);
 
   useEffect(() => {
@@ -57,6 +58,10 @@ const App = () => {
         setPassword("");
       }
     } catch (error) {
+      setToast({
+        message: 'invalid username or password ' + new Date(),
+        type: 'error'
+      })
       console.log(error);
     }
   };
@@ -66,26 +71,43 @@ const App = () => {
     setUser(null);
   };
 
-  const createBlog = async (event) => {
-    event.preventDefault();
-
+  const createBlog = async (blog) => {
     try {
-      const blog = {
-        title,
-        author,
-        url,
-      };
       const newBlog = await blogService.postBlog(blog);
-      setBlogs(blogs.concat(newBlog)) //TODO: newBlog user only return ID
+      // setBlogs(blogs.concat(newBlog)) //TODO: newBlog user only return ID
+      //TODO: temporary resolve
+      await getBlogs();
       setToast({
         message: `a new blog ${newBlog.title}! by ${newBlog.author} added`,
-        type: 'success',
-        time: 1000
+        type: 'success'
       })
     } catch (error) {
       console.log(error);
     }
   };
+
+  const deletePost = async (id) => {
+    try {
+      await blogService.deleteBlog(id);
+      setBlogs(blogs.filter(blog => blog.id !== id));
+      setToast({
+        message: `delete blog successfully`,
+        type: 'success'
+      })
+    } catch (error) {
+      console.log(error);
+      setToast({
+        message: `can't delete blog`,
+        type: 'error'
+      })
+    }
+  }
+
+  const getBlogs = async () => {
+    const blogs = await blogService.getAll()
+    blogs.sort((a, b) => b.likes - a.likes)
+    setBlogs(blogs);
+  }
 
   const loginForm = () => {
     return (
@@ -123,34 +145,11 @@ const App = () => {
 
   const blogForm = () => {
     return (
-      <div>
-        <form onSubmit={createBlog}>
-          <h2>create new</h2>
-          <div>
-            title
-            <input
-              value={title}
-              onChange={({ target }) => setTitle(target.value)}
-            ></input>
-          </div>
-          <div>
-            author
-            <input
-              value={author}
-              onChange={({ target }) => setAuthor(target.value)}
-            ></input>
-          </div>
-          <div>
-            url
-            <input
-              value={url}
-              onChange={({ target }) => setUrl(target.value)}
-            ></input>
-          </div>
-          <button type="submit">create</button>
-        </form>
-      </div>
-    );
+      <ToggleContent label={'create blog'}>
+        <BlogForm createBlog={createBlog}>
+        </BlogForm>
+      </ToggleContent>
+    )
   };
 
   if (user !== null) {
@@ -164,7 +163,7 @@ const App = () => {
         <br></br>
         {blogForm()}
         {blogs.map((blog) => (
-          <Blog key={blog.id} blog={blog} />
+          <Blog key={blog.id} blog={blog} deletePost={deletePost}/>
         ))}
       </div>
     );
